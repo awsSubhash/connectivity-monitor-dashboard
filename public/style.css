@@ -158,3 +158,86 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Downtime History Styles */
+.downtime-section {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+}
+
+.downtime-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  color: #94a3b8;
+}
+
+.downtime-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.downtime-list li {
+  font-size: 0.85rem;
+  padding: 0.3rem 0;
+  color: #cbd5e1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.downtime-list li:last-child {
+  border-bottom: none;
+}
+
+/* Notifications */
+#notifications {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 1000;
+}
+
+.notification {
+  background: #3b82f6;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  animation: slideIn 0.3s ease-out;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.notification-icon {
+  font-size: 1.2rem;
+}
+
+.notification-text {
+  font-size: 0.9rem;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .downtime-section h3 {
+    font-size: 0.9rem;
+  }
+  
+  .downtime-list li {
+    font-size: 0.8rem;
+  }
+  
+  .notification {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+}
