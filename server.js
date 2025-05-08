@@ -69,6 +69,7 @@ function checkStatus() {
         address: target.address,
         alive: !isDown,
         time: new Date().toLocaleTimeString()
+        
       };
 
       if (isDown) {
