@@ -9,7 +9,6 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// List of IPs/hosts to monitor
 const targets = [
   { name: 'Google DNS', address: '8.8.8.8' },
   { name: 'Cloudflare DNS', address: '1.1.1.1' },
@@ -19,7 +18,6 @@ const targets = [
 
 let statusMap = {};
 
-// Setup email transporter using .env config
 const transporter = nodemailer.createTransport({
   service: process.env.EMAIL_SERVICE,
   auth: {
@@ -28,7 +26,6 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Send alert email every time a host is down
 function sendAlertEmail(target) {
   const mailOptions = {
     from: process.env.EMAIL_USER,
@@ -42,13 +39,31 @@ function sendAlertEmail(target) {
       console.error('❌ Email sending failed:', error);
     } else {
       console.log(`✅ Alert email sent for ${target.name}: ${info.response}`);
+      wss.clients.forEach(client => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify({
+            type: 'notification',
+            message: `Email alert sent for ${target.name} at ${new Date().toLocaleTimeString()}`
+          }));
+        }
+      });
     }
   });
 }
 
-// Broadcast latest status to all WebSocket clients
 function broadcastStatus() {
-  const payload = JSON.stringify(statusMap);
+  const payload = JSON.stringify({
+    type: 'status',
+    data: Object.values(statusMap).map(host => ({
+      ...host,
+      lastChecked: host.lastChecked.toISOString(),
+      downtimes: host.downtimes.map(d => ({
+        start: d.start.toISOString(),
+        end: d.end ? d.end.toISOString() : null
+      }))
+    }))
+  });
+
   wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload);
@@ -56,44 +71,53 @@ function broadcastStatus() {
   });
 }
 
-// Check all targets and update status
-function checkStatus() {
-  targets.forEach(async target => {
+async function checkStatus() {
+  for (const target of targets) {
     try {
       const res = await ping.promise.probe(target.address, { timeout: 5 });
       const isDown = !res.alive;
+      const now = new Date();
 
-      // Save status for frontend
-      statusMap[target.address] = {
-        name: target.name,
-        address: target.address,
-        alive: !isDown,
-        time: new Date().toLocaleTimeString()
-        
-      };
-
-      if (isDown) {
-        sendAlertEmail(target); // Send alert every 30s if down
+      if (!statusMap[target.address]) {
+        statusMap[target.address] = {
+          name: target.name,
+          address: target.address,
+          alive: true,
+          downtimes: [],
+          lastChecked: now
+        };
       }
 
+      const hostStatus = statusMap[target.address];
+      const wasAlive = hostStatus.alive;
+
+      hostStatus.alive = !isDown;
+      hostStatus.lastChecked = now;
+
+      if (!wasAlive && !isDown) {
+        // Host recovered
+        const ongoing = hostStatus.downtimes.find(d => !d.end);
+        if (ongoing) ongoing.end = now;
+      } else if (wasAlive && isDown) {
+        // New downtime
+        hostStatus.downtimes.push({
+          start: now,
+          end: null
+        });
+        sendAlertEmail(target);
+      }
     } catch (err) {
       console.error(`Error pinging ${target.address}:`, err);
     }
-  });
+  }
 
-  // After checking all, broadcast and schedule next round
-  setTimeout(() => {
-    broadcastStatus();
-    checkStatus();
-  }, 30000);
+  broadcastStatus();
+  setTimeout(checkStatus, 30000);
 }
 
-// Serve frontend from public/
 app.use(express.static('public'));
 
-// Start server
 server.listen(3000, () => {
   console.log('🚀 Server running at http://localhost:3000');
-  checkStatus(); // Start monitoring loop
+  checkStatus();
 });
-
